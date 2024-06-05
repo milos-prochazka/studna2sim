@@ -47,9 +47,13 @@ class StudnaDevice extends ThingsboardDevice
   bool din1 = false;
   bool din2 = false;
   bool dout1 = false;
-  var dout1ManualEnd = DateTime(0);
+  var _manualDout1End = DateTime(0);
+  var _manualOut1Start = 0.0;
+  bool _manualDout1Override = false;
   bool dout2 = false;
-  var dout2ManuallEnd = DateTime(0);
+  var _manualDout2End = DateTime(0);
+  var _manualOut2Start = 0.0;
+  bool _manualDout2Override = false;
   int cnt1 = 0;
   int cnt1Past = 0;
   String wifi = '';
@@ -79,12 +83,10 @@ class StudnaDevice extends ThingsboardDevice
   {
     final uptime = DateTime.now().difference(startTime).inSeconds;
 
-    final now = DateTime.now();
-
-    final dout1ManualOverride = _dout1Mode.mode != _StudnaOutputModeEnum.manual && now.isAfter(dout1ManualEnd);
+    final dout1ManualOverride = _dout1Mode.mode != _StudnaOutputModeEnum.manual && _manualDout1Override;
     final dout1Mode = dout1ManualOverride ? _StudnaOutputModeEnum.manual : _dout1Mode.mode;
 
-    final dout2ManualOverride = _dout2Mode.mode != _StudnaOutputModeEnum.manual && now.isAfter(dout2ManuallEnd);
+    final dout2ManualOverride = _dout2Mode.mode != _StudnaOutputModeEnum.manual && _manualDout2Override;
     final dout2Mode = dout2ManualOverride ? _StudnaOutputModeEnum.manual : _dout2Mode.mode;
 
     final telemetry = 
@@ -344,10 +346,10 @@ class StudnaDevice extends ThingsboardDevice
         required StudnaAinZone zone,
         required double level,
         required _StudnaOutputMode outputMode,
-        required DateTime manualEnd}
+        required bool manualOverride}
     ) 
     {
-      if (DateTime.now().isAfter(manualEnd)) 
+      if (!manualOverride) 
       {
         switch (outputMode.mode) 
         {
@@ -440,6 +442,17 @@ class StudnaDevice extends ThingsboardDevice
       return output;
     }
 
+    bool testManualEnd(DateTime manualEnd, double level, double manualStart, _StudnaOutputMode outputMode) 
+    {
+      var result = DateTime.now().isAfter(manualEnd);
+      if (outputMode.maxLevelChange != 0.0) 
+      {
+        result |=  (level - manualStart).abs() > outputMode.maxLevelChange.abs();
+      }
+
+      return result;
+    }
+
     batteryPower += batteryStep;
     if (batteryPower > 100.0) 
     {
@@ -457,17 +470,19 @@ class StudnaDevice extends ThingsboardDevice
 
     if (hasDout1) 
     {
+      _manualDout1Override = _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
       _setDout1
       (
-        controlDout(output: dout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualEnd: dout1ManualEnd)
+        controlDout(output: dout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override)
       );
     }
 
     if (hasDout2) 
     {
+      _manualDout2Override = _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
       _setDout2
       (
-        controlDout(output: dout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualEnd: dout2ManuallEnd)
+        controlDout(output: dout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override)
       );
     }
 
@@ -487,13 +502,21 @@ class StudnaDevice extends ThingsboardDevice
     switch (method.trim().toLowerCase()) 
     {
       case 'setdout1':
+      {
       _setDout1(params);
-      dout1ManualEnd = DateTime.now().add(Duration(seconds: _dout1Mode.maxTime.toInt()));
+      _manualDout1End = DateTime.now().add(Duration(seconds: _dout1Mode.maxTime.toInt()));
+      _manualOut1Start = ain1;
+      _manualDout1Override = true;
+      }
       break;
 
       case 'setdout2':
+      {
       _setDout2(params);
-      dout2ManuallEnd = DateTime.now().add(Duration(seconds: _dout2Mode.maxTime.toInt()));
+      _manualDout2End = DateTime.now().add(Duration(seconds: _dout2Mode.maxTime.toInt()));
+      _manualOut2Start = ain2;
+      _manualDout2Override = true;
+      }
       break;
     }
     return result;
@@ -548,7 +571,7 @@ class _StudnaOutputMode
   minimum = getDouble(getItemFromPath(config, ['minimum']), defaultValue: 0.0),
   maximum = getDouble(getItemFromPath(config, ['maximum']), defaultValue: 5.0),
   maxLevelChange = getDouble(getItemFromPath(config, ['max_level_change']), defaultValue: 1.0),
-  maxTime = getDouble(getItemFromPath(config, ['max_time']), defaultValue: 60.0),
+  maxTime = 60.0 * getDouble(getItemFromPath(config, ['max_time']), defaultValue: 60.0),
   schedulerOkHigh = decodeScheduler(getItemFromPath(config, ['scheduler', 'ok_high'])),
   schedulerCriticalLow = decodeScheduler(getItemFromPath(config, ['scheduler', 'critical_low']));
 
