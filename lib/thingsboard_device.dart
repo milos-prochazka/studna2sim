@@ -229,30 +229,48 @@ class ThingsboardDevice
     {
       reconnect = false;
 
-      if (!await connect()) 
-      {
-        print('Failed to connect to $server');
-        reconnect = deviceNoConnected();
-        if (!reconnect) 
-        {
-          return;
-        }
-      }
-
       try 
       {
-        deviceInit();
+        if (!await connect()) 
+        {
+          print('Failed to connect to $server');
+          reconnect = deviceNoConnected();
+          if (!reconnect) 
+          {
+            return;
+          }
+        }
 
-        reconnect = await deviceRun();
+        try 
+        {
+          deviceInit();
+
+          final f = deviceRun();
+
+          final fErr = f.catchError
+          (
+            (e, s) 
+            {
+              logError(e.toString(), s.toString());
+              return deviceException(e as Exception);
+            }
+          );
+
+          reconnect = await Future.any([f, fErr]);
+        } 
+        catch (e, s) 
+        {
+          logError(e.toString(), s.toString());
+          reconnect = deviceException(e as Exception);
+        } 
+        finally 
+        {
+          disconnect();
+        }
       } 
       catch (e, s) 
       {
         logError(e.toString(), s.toString());
-        reconnect = deviceException(e as Exception);
-      } 
-      finally 
-      {
-        disconnect();
       }
 
       if (reconnect) 

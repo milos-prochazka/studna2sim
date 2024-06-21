@@ -30,7 +30,8 @@ Future studnaMqtt({required String server, required String token, dynamic config
 class StudnaDevice extends ThingsboardDevice 
 {
   double upSpeed, downSpeed;
-  double solarSpeed = 0.05;
+  double solarSpeed = 0;
+  int solarTimer = 10;
   bool hasGsm = false;
   String name = 'studna2sim';
   double updateInterval = 60.0;
@@ -319,14 +320,17 @@ class StudnaDevice extends ThingsboardDevice
       if (!hasDout) 
       {
         level += solarSpeed;
-        if (level > 4.5) 
+        if (--solarTimer <=0)
         {
-          solarSpeed = -(0.00001 + _rnd.nextDouble() * downSpeed);
-        } 
-        else if (level < 0.7) 
-        {
-          solarSpeed = (0.00001 + _rnd.nextDouble() * upSpeed);
+          solarSpeed = (_rnd.nextDouble()-0.5) * upSpeed;
+          solarTimer = _rnd.nextInt(4*3600);
         }
+
+        if (level > 5.0 || level < 0.5) 
+        {
+          solarSpeed = -solarSpeed;
+          level += 2.5 *solarSpeed;
+        } 
       } 
       else if (outputMode.mode == _StudnaOutputModeEnum.filling) 
       {
@@ -447,7 +451,7 @@ class StudnaDevice extends ThingsboardDevice
       var result = DateTime.now().isAfter(manualEnd);
       if (outputMode.maxLevelChange != 0.0) 
       {
-        result |=  (level - manualStart).abs() > outputMode.maxLevelChange.abs();
+        result |= (level - manualStart).abs() > outputMode.maxLevelChange.abs();
       }
 
       return result;
@@ -470,25 +474,27 @@ class StudnaDevice extends ThingsboardDevice
 
     if (hasDout1) 
     {
-      _manualDout1Override = _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
-      _setDout1
-      (
-        controlDout(output: dout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override)
-      );
+      _manualDout1Override =
+      _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
+      _setDout1(controlDout
+        (
+          output: dout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override
+        ));
     }
 
     if (hasDout2) 
     {
-      _manualDout2Override = _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
-      _setDout2
-      (
-        controlDout(output: dout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override)
-      );
+      _manualDout2Override =
+      _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
+      _setDout2(controlDout
+        (
+          output: dout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override
+        ));
     }
 
     ain1 = controlAin(ain1, dout1, hasDout1, _dout1Mode);
 
-    if (hasAin2)
+    if (hasAin2) 
     {
       ain2 = controlAin(ain2, dout2, hasDout2, _dout2Mode);
     }
@@ -503,19 +509,19 @@ class StudnaDevice extends ThingsboardDevice
     {
       case 'setdout1':
       {
-      _setDout1(params);
-      _manualDout1End = DateTime.now().add(Duration(seconds: _dout1Mode.maxTime.toInt()));
-      _manualOut1Start = ain1;
-      _manualDout1Override = true;
+        _setDout1(params);
+        _manualDout1End = DateTime.now().add(Duration(seconds: _dout1Mode.maxTime.toInt()));
+        _manualOut1Start = ain1;
+        _manualDout1Override = true;
       }
       break;
 
       case 'setdout2':
       {
-      _setDout2(params);
-      _manualDout2End = DateTime.now().add(Duration(seconds: _dout2Mode.maxTime.toInt()));
-      _manualOut2Start = ain2;
-      _manualDout2Override = true;
+        _setDout2(params);
+        _manualDout2End = DateTime.now().add(Duration(seconds: _dout2Mode.maxTime.toInt()));
+        _manualOut2Start = ain2;
+        _manualDout2Override = true;
       }
       break;
     }

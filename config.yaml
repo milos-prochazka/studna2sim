@@ -1,11 +1,11 @@
 reconnect_timeout: 60
 devices:
   # Normalni studna
-  - token: y9fMRfFTLuBhdvz7gsrj
-    type: studna2
-    variant: single
-    up_speed: 0.001
-    down_speed: 0.0005
+  # - token: y9fMRfFTLuBhdvz7gsrj
+  #   type: studna2
+  #   variant: single
+  #   up_speed: 0.001
+  #   down_speed: 0.0005
 
   # Studna se dvema vystupy
   # - token: KJ4HOWsSoBIuL8A3ZbOM
@@ -22,8 +22,8 @@ devices:
   #   down_speed: 0.001
 
   # Studna solar
-  # - token: AhxGKXmzpgALMMdJIWDL
-  #   type: studna2
-  #   variant: solar
-  #   up_speed: 0.0003
-  #   down_speed: 0.0001
+  - token: AhxGKXmzpgALMMdJIWDL
+    type: studna2
+    variant: solar
+    up_speed: 0.0003
+    down_speed: 0.0001
