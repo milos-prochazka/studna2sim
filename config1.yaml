@@ -1,0 +1,42 @@
+reconnect_timeout: 60
+
+# CML5 server
+server: cml5.seapraha.cz
+
+devices:
+
+  # Studna max
+  - token: e4EEzV3lfST8sSqBjsN9
+    type: studna2
+    variant: max
+    up_speed: 0.01
+    down_speed: 0.001
+
+  # Studna solar
+  - token: vJWXBPMIhOpjHH4BAdsq
+    type: studna2
+    variant: solar
+    up_speed: 0.0003
+    down_speed: 0.0001
+
+  # Normalni studna 
+  - token: Z9SIKTeHh7MaTNzzjcbv
+#    - token: mcvvsrkwd7hFHqej8bpH
+    type: studna2
+    variant: duo
+    up_speed: 0.01
+    down_speed: 0.01
+        
+  # Studna se dvema vystupy
+  - token: xOg21HspD7MGlndbjN53
+    type: studna2
+    variant: duo
+    up_speed: 0.02
+    down_speed: 0.005
+
+  # Druha normalni studna 
+  - token: UMb92pnhXgz4eOQ8bh8l
+    type: studna2
+    variant: duo
+    up_speed: 0.01
+    down_speed: 0.01

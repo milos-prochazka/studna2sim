@@ -1,13 +1,7 @@
-import 'package:studna2sim/studna2sim.dart';
 import 'package:test/test.dart';
 
-void main() 
-{
-  test
-  (
-    'calculate', () 
-    {
-      //expect(calculate(), 42);
-    }
-  );
+void main() {
+  test('calculate', () {
+    //expect(calculate(), 42);
+  });
 }
