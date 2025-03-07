@@ -49,11 +49,15 @@ class StudnaDevice extends ThingsboardDevice
   StudnaAinZone ain2Zone = StudnaAinZone.ok;
   bool din1 = false;
   bool din2 = false;
-  bool dout1 = false;
+  bool alterDout1 = true;
+  bool stateDout1 = false;
+  bool get dout1 => stateDout1 && alterDout1;
   var _manualDout1End = DateTime(0);
   var _manualOut1Start = 0.0;
   bool _manualDout1Override = false;
-  bool dout2 = false;
+  bool stateDout2 = false;
+  bool alterDout2 = true;
+  bool get dout2 => stateDout2 && alterDout2;
   var _manualDout2End = DateTime(0);
   var _manualOut2Start = 0.0;
   bool _manualDout2Override = false;
@@ -85,6 +89,7 @@ class StudnaDevice extends ThingsboardDevice
 
   bool publishRequest = true;
 
+  /// Publish telemetry data to ThingsBoard
   void publish() 
   {
     final uptime = DateTime.now().difference(startTime).inSeconds;
@@ -115,7 +120,7 @@ class StudnaDevice extends ThingsboardDevice
         "manual_override": dout1ManualOverride,
         "alternating": _dout1Mode.alternating.enabled
       },
-      if (hasDout1) "dout1_v": dout1 ? 1 : 0,
+      if (hasDout1) "dout1_v": stateDout1 ? 1 : 0,
       if (hasDout2)
       "dout2": 
       {
@@ -125,7 +130,7 @@ class StudnaDevice extends ThingsboardDevice
         "manual_override": dout2ManualOverride,
         "alternating": _dout2Mode.alternating.enabled
       },
-      if (hasDout2) "dout2_v": dout2 ? 1 : 0,
+      if (hasDout2) "dout2_v": stateDout2 ? 1 : 0,
       if (hasCnt1) "cnt1": {"value": cnt1, "past_value": cnt1Past, "units": "l"},
       if (hasCnt1) "cnt1_v": cnt1,
       //"log": {"name": "mqttConnect", "content": "OK"},
@@ -239,6 +244,8 @@ class StudnaDevice extends ThingsboardDevice
       {
         if (value is Map) 
         {
+          _manualDout1Override = false;
+          _manualDout2Override = false;
           config = value;
           final system = getItemFromPath(config, ['system']);
           name = getString(getItemFromPath(system, ['station_name']), defaultValue: name);
@@ -367,7 +374,7 @@ class StudnaDevice extends ThingsboardDevice
 
     bool alternatingDout
     (
-      {required bool output,
+      { required bool output,
         required _StudnaOutputMode outputMode,
         required _StudnaOutputState outputState,
         required bool manualOverride}
@@ -381,17 +388,16 @@ class StudnaDevice extends ThingsboardDevice
           final timeout = outputMode.alternating.timeout;
           final active = outputMode.alternating.active;
           final time = now.difference(outputState.alternatingTime).inSeconds;
-          output = true; // test
-          output &= time < active || time > timeout;
-          if (output && time > timeout) 
+          final result = time < active || time > timeout;
+          if (output && result && time > timeout) 
           {
             outputState.alternatingTime = now;
           }
-          return output;
+          return result;
         }
       }
 
-      return output;
+      return true;
     }
 
     bool controlDout
@@ -522,6 +528,9 @@ class StudnaDevice extends ThingsboardDevice
       return result;
     }
 
+
+    /////////////// Simulation /////////////////////////////////////////////////
+
     batteryPower += batteryStep;
     if (batteryPower > 100.0) 
     {
@@ -543,17 +552,19 @@ class StudnaDevice extends ThingsboardDevice
       _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
       _setDout1
       (
-        alternatingDout
-        (
-          output: controlDout
+        controlDout
           (
-            output: dout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override
+            output: stateDout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override
           ),
+      );
+
+      alterDout1 = alternatingDout
+        (
+          output: stateDout1,
           outputMode: _dout1Mode,
           outputState: _dout1State,
           manualOverride: false
-        )
-      );
+        );
     }
 
     if (hasDout2) 
@@ -562,17 +573,19 @@ class StudnaDevice extends ThingsboardDevice
       _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
       _setDout2
       (
-        alternatingDout
-        (
-          output: controlDout
+        controlDout
           (
-            output: dout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override
+            output: stateDout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override
           ),
+      );
+
+      alterDout2 = alternatingDout
+        (
+          output: stateDout2,
           outputMode: _dout2Mode,
           outputState: _dout2State,
           manualOverride: false
-        )
-      );
+        );
     }
 
     final ain1Prev = ain1;
@@ -599,6 +612,8 @@ class StudnaDevice extends ThingsboardDevice
 
     din1 = ain1 > 2.35;
     din2 = ain1 > 2.75;
+
+    ///////////////////////////////////////////////////////////////////////
   }
 
   DateTime _manualEndTime(_StudnaOutputMode mode)
@@ -626,7 +641,7 @@ class StudnaDevice extends ThingsboardDevice
         _setDout1(params);
         _manualDout1End = _manualEndTime(_dout1Mode);
         _manualOut1Start = ain1;
-        _manualDout1Override = true;
+        _manualDout1Override = stateDout1 || _dout1Mode.mode != _StudnaOutputModeEnum.manual;
       }
       break;
 
@@ -635,7 +650,7 @@ class StudnaDevice extends ThingsboardDevice
         _setDout2(params);
         _manualDout2End = _manualEndTime(_dout2Mode);
         _manualOut2Start = ain2;
-        _manualDout2Override = true;
+        _manualDout2Override = stateDout2 || _dout2Mode.mode != _StudnaOutputModeEnum.manual;
       }
       break;
     }
@@ -648,9 +663,9 @@ class StudnaDevice extends ThingsboardDevice
   void _setDout1(dynamic value) 
   {
     final v = getBool(value);
-    if (v != dout1) 
+    if (v != stateDout1) 
     {
-      dout1 = v;
+      stateDout1 = v;
       publishRequest = true;
     }
   }
@@ -658,9 +673,9 @@ class StudnaDevice extends ThingsboardDevice
   void _setDout2(dynamic value) 
   {
     final v = getBool(value);
-    if (v != dout2) 
+    if (v != stateDout2) 
     {
-      dout2 = v;
+      stateDout2 = v;
       publishRequest = true;
     }
   }
@@ -802,7 +817,7 @@ class _StudnaOutputMode
 
   static _AlternatigMode decodeAlternating(dynamic config) 
   {
-    if (config case {'enable': bool enabled, 'timeout': num timeout, 'active': num active}) 
+    if (config case {'enabled': bool enabled, 'timeout': num timeout, 'active': num active}) 
     {
       return (enabled: enabled, timeout: timeout.toDouble(), active: active.toDouble());
     }
