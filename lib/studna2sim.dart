@@ -409,8 +409,58 @@ class StudnaDevice extends ThingsboardDevice
         required bool manualOverride}
     ) 
     {
+      void upperLowerMode()
+      {
+          switch (outputMode.regulatorSource)
+          {
+            case 'ain1':
+            {
+              level = ain1;
+            }
+            break;
+
+            case 'ain2':
+            {
+              level = ain2;
+            }
+            break;
+
+            case 'din1':
+            {
+              level = din1 ? 10000.0 : -10000.0;
+            }
+            break;
+
+            case 'din2':
+            {
+              level = din2 ? 10000.0 : -10000.0;
+            }
+            break;
+
+            case 'din1+din2':
+            {
+              if (din1 && din2) 
+              {
+                level = 10000.0;
+              } 
+              else if (!din1 && !din2) 
+              {
+                level = -10000.0;
+              } 
+              else 
+              {
+                level = 0.5*(outputMode.maximum+outputMode.minimum);
+              }
+            }
+            break;
+
+          }
+
+      }
+
       if (!manualOverride) 
       {
+
         switch (outputMode.mode) 
         {
           case _StudnaOutputModeEnum.manual:
@@ -420,6 +470,7 @@ class StudnaDevice extends ThingsboardDevice
 
           case _StudnaOutputModeEnum.upper:
           {
+            upperLowerMode();
             if (level > outputMode.maximum) 
             {
               return true;
@@ -436,6 +487,7 @@ class StudnaDevice extends ThingsboardDevice
 
           case _StudnaOutputModeEnum.lower:
           {
+            upperLowerMode();
             if (level < outputMode.minimum) 
             {
               return true;
@@ -610,8 +662,12 @@ class StudnaDevice extends ThingsboardDevice
       }
     }
 
-    din1 = ain1 > 2.35;
-    din2 = ain1 > 2.75;
+    if (ain1 > 2.35) din1 = true;
+    if (ain1 < 2.25) din1 = false;
+
+    if (ain1 > 2.85) din2 = true;
+    if (ain1 < 2.75) din2 = false;
+
 
     ///////////////////////////////////////////////////////////////////////
   }
@@ -700,6 +756,7 @@ class _StudnaOutputMode
   _StudnaOutputModeEnum mode;
   double minimum = 0.0;
   double maximum = 5.0;
+  String regulatorSource;
   double maxLevelChange = 1.0;
   double maxTime = 60.0;
   _SchedulerMode schedulerOkHigh;
@@ -717,6 +774,7 @@ class _StudnaOutputMode
   ),
   minimum = getDouble(getItemFromPath(config, ['regulator', 'minimum']), defaultValue: 0.0),
   maximum = getDouble(getItemFromPath(config, ['regulator', 'maximum']), defaultValue: 5.0),
+  regulatorSource = getString(getItemFromPath(config, ['regulator', 'regulator_source']), defaultValue: ''),
   maxLevelChange = getDouble(getItemFromPath(config, ['manual', 'max_level_change']), defaultValue: 1.0),
   maxTime = 60.0 * getDouble(getItemFromPath(config, ['manual', 'max_time']), defaultValue: 60.0),
   schedulerOkHigh = decodeScheduler(getItemFromPath(config, ['scheduler', 'ok_high'])),
