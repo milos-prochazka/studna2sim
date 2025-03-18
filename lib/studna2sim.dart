@@ -89,6 +89,28 @@ class StudnaDevice extends ThingsboardDevice
 
   bool publishRequest = true;
 
+  static String iso8601()
+  {
+    final now = DateTime.now();
+    if (now.isUtc)
+    {
+      return now.toIso8601String();
+    }
+    else
+    {
+      var offset = now.timeZoneOffset;
+      var h = offset.inHours;
+      var m = offset.inMinutes.remainder(60);
+      return '${now.toIso8601String()}${h >= 0 ? '+' : '-'}${h.abs().toString().padLeft(2, '0')}:${m.abs().toString().padLeft(2, '0')}';
+    }
+  }
+
+  static double round(double value, int decimals) 
+  {
+    final fac = math.pow(10, decimals);
+    return (value * fac).round() / fac;
+  }
+
   /// Publish telemetry data to ThingsBoard
   void publish() 
   {
@@ -104,9 +126,9 @@ class StudnaDevice extends ThingsboardDevice
     {
       "version": 2,
       if (hasAin1) "ain1": {"str": ain1.toStringAsFixed(2), "units": "m", "zone": ain1Zone.name},
-      if (hasAin1) "ain1_v": ain1,
+      if (hasAin1) "ain1_v": round(ain1,4),
       if (hasAin2) "ain2": {"str": ain2.toStringAsFixed(2), "units": "m", "zone": ain1Zone.name},
-      if (hasAin2) "ain2_v": ain2,
+      if (hasAin2) "ain2_v": round(ain2,4),
       if (hasDin1) "din1": {"str": din1 ? "1" : "0", "value_fast": false},
       if (hasDin1) "din1_v": din1 ? 1 : 0,
       if (hasDin2) "din2": {"str": din2 ? "1" : "0", "value_fast": true},
@@ -144,8 +166,10 @@ class StudnaDevice extends ThingsboardDevice
         "operator_id": "23002",
         "credit": "-"
       },
-      if (hasBattery) "power": {"battery_charge": 100, "power_supply": "battery"},
-      "system": {"uptime_sec": uptime, "v5v": 5.85 + _rnd.nextDouble() * 0.2}
+      //if (hasBattery) "power": {"battery_charge": 100, "power_supply": "battery"},
+      if (hasBattery) "batt": {"capacity": round(batteryPower,2), "voltage": round(3.4+batteryPower*0.008,3)},
+      "system": {"uptime_sec": uptime, "v5v": round(4.85 + _rnd.nextDouble() * 0.2,2)},
+      "log": { "current time":   iso8601() }
     };
 
     publishTelemetry(telemetry);
