@@ -791,11 +791,10 @@ class _StudnaOutputMode
   maxTime = 60.0 * getDouble(getItemFromPath(config, ['manual', 'max_time']), defaultValue: 60.0),
   schedulerOkHigh = decodeScheduler(getItemFromPath(config, ['scheduler', 'ok_high'])),
   schedulerCriticalLow = decodeScheduler(getItemFromPath(config, ['scheduler', 'critical_low'])),
-  /*alternating = decodeAlternating2
+  alternating = decodeAlternating2
   (
     getItemFromPath(config, ['regulator']), decodeAlternating(getItemFromPath(config, ['alternating']))
-  )*/ 
-  alternating = decodeAlternating(getItemFromPath(config, ['alternating']))
+  ) 
   {
     if (config case {'scheduler2': List scheduler2}) 
     {
