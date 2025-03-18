@@ -600,6 +600,17 @@ class StudnaDevice extends ThingsboardDevice
         batteryPower = 0.0;
         batteryStep = 0.001;
       }
+
+      final ain1Prev = ain1;
+      final ain2Prev = ain2;
+
+      ain1 = controlAin(ain1, dout1, hasDout1, _dout1Mode);
+
+      if (hasAin2) 
+      {
+        ain2 = controlAin(ain2, dout2, hasDout2, _dout2Mode);
+      }
+
       ain1Zone = controlAinLevel(ain1Zone, ain1, _ain1Mode);
 
       ain2Zone = controlAinLevel(ain2Zone, ain2, _ain2Mode);
@@ -646,15 +657,6 @@ class StudnaDevice extends ThingsboardDevice
           );
       }
 
-      final ain1Prev = ain1;
-      final ain2Prev = ain2;
-
-      ain1 = controlAin(ain1, dout1, hasDout1, _dout1Mode);
-
-      if (hasAin2) 
-      {
-        ain2 = controlAin(ain2, dout2, hasDout2, _dout2Mode);
-      }
 
       if (hasCnt1) 
       {
