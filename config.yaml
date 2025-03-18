@@ -6,10 +6,9 @@ server: cml5.seapraha.cz
 devices:
 
         
-  # Studna se dvema vystupy
-  - token: xOg21HspD7MGlndbjN53
+  # Druha studna max
+  - token: D4sdtGLQ1TjcWxNpkDNa
     type: studna2
-    variant: duo
-    up_speed: 0.02
-    down_speed: 0.005
-
+    variant: max
+    up_speed: 0.01
+    down_speed: 0.001

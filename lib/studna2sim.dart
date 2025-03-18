@@ -120,7 +120,7 @@ class StudnaDevice extends ThingsboardDevice
         "manual_override": dout1ManualOverride,
         "alternating": _dout1Mode.alternating.enabled
       },
-      if (hasDout1) "dout1_v": stateDout1 ? 1 : 0,
+      if (hasDout1) "dout1_v": dout1 ? 1 : 0,
       if (hasDout2)
       "dout2": 
       {
@@ -130,7 +130,7 @@ class StudnaDevice extends ThingsboardDevice
         "manual_override": dout2ManualOverride,
         "alternating": _dout2Mode.alternating.enabled
       },
-      if (hasDout2) "dout2_v": stateDout2 ? 1 : 0,
+      if (hasDout2) "dout2_v": dout2 ? 1 : 0,
       if (hasCnt1) "cnt1": {"value": cnt1, "past_value": cnt1Past, "units": "l"},
       if (hasCnt1) "cnt1_v": cnt1,
       //"log": {"name": "mqttConnect", "content": "OK"},
@@ -582,93 +582,103 @@ class StudnaDevice extends ThingsboardDevice
 
 
     /////////////// Simulation /////////////////////////////////////////////////
+    
+    final oldDout1 = dout1;
+    final oldDout2 = dout2;
+    final oldDin1 = din1;
+    final oldDin2 = din2;
 
-    batteryPower += batteryStep;
-    if (batteryPower > 100.0) 
     {
-      batteryPower = 100.0;
-      batteryStep = -0.0003;
-    } 
-    else if (batteryPower < 0.0) 
-    {
-      batteryPower = 0.0;
-      batteryStep = 0.001;
-    }
-    ain1Zone = controlAinLevel(ain1Zone, ain1, _ain1Mode);
-
-    ain2Zone = controlAinLevel(ain2Zone, ain2, _ain2Mode);
-
-    if (hasDout1) 
-    {
-      _manualDout1Override =
-      _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
-      _setDout1
-      (
-        controlDout
-          (
-            output: stateDout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override
-          ),
-      );
-
-      alterDout1 = alternatingDout
-        (
-          output: stateDout1,
-          outputMode: _dout1Mode,
-          outputState: _dout1State,
-          manualOverride: false
-        );
-    }
-
-    if (hasDout2) 
-    {
-      _manualDout2Override =
-      _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
-      _setDout2
-      (
-        controlDout
-          (
-            output: stateDout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override
-          ),
-      );
-
-      alterDout2 = alternatingDout
-        (
-          output: stateDout2,
-          outputMode: _dout2Mode,
-          outputState: _dout2State,
-          manualOverride: false
-        );
-    }
-
-    final ain1Prev = ain1;
-    final ain2Prev = ain2;
-
-    ain1 = controlAin(ain1, dout1, hasDout1, _dout1Mode);
-
-    if (hasAin2) 
-    {
-      ain2 = controlAin(ain2, dout2, hasDout2, _dout2Mode);
-    }
-
-    if (hasCnt1) 
-    {
-      cnt1Acum += 100.0 * ((ain1 - ain1Prev).abs() + (ain2 - ain2Prev).abs());
-      int icnt = cnt1Acum.toInt();
-      if (icnt > 0) 
+      batteryPower += batteryStep;
+      if (batteryPower > 100.0) 
       {
-        cnt1Past = cnt1;
-        cnt1 += icnt;
-        cnt1Acum -= icnt;
+        batteryPower = 100.0;
+        batteryStep = -0.0003;
+      } 
+      else if (batteryPower < 0.0) 
+      {
+        batteryPower = 0.0;
+        batteryStep = 0.001;
       }
+      ain1Zone = controlAinLevel(ain1Zone, ain1, _ain1Mode);
+
+      ain2Zone = controlAinLevel(ain2Zone, ain2, _ain2Mode);
+
+      if (hasDout1) 
+      {
+        _manualDout1Override =
+        _manualDout1Override && !testManualEnd(_manualDout1End, ain1, _manualOut1Start, _dout1Mode);
+        _setDout1
+        (
+          controlDout
+            (
+              output: stateDout1, zone: ain1Zone, level: ain1, outputMode: _dout1Mode, manualOverride: _manualDout1Override
+            ),
+        );
+
+        alterDout1 = alternatingDout
+          (
+            output: stateDout1,
+            outputMode: _dout1Mode,
+            outputState: _dout1State,
+            manualOverride: false
+          );
+      }
+
+      if (hasDout2) 
+      {
+        _manualDout2Override =
+        _manualDout2Override && !testManualEnd(_manualDout2End, ain2, _manualOut2Start, _dout2Mode);
+        _setDout2
+        (
+          controlDout
+            (
+              output: stateDout2, zone: ain2Zone, level: ain2, outputMode: _dout2Mode, manualOverride: _manualDout2Override
+            ),
+        );
+
+        alterDout2 = alternatingDout
+          (
+            output: stateDout2,
+            outputMode: _dout2Mode,
+            outputState: _dout2State,
+            manualOverride: false
+          );
+      }
+
+      final ain1Prev = ain1;
+      final ain2Prev = ain2;
+
+      ain1 = controlAin(ain1, dout1, hasDout1, _dout1Mode);
+
+      if (hasAin2) 
+      {
+        ain2 = controlAin(ain2, dout2, hasDout2, _dout2Mode);
+      }
+
+      if (hasCnt1) 
+      {
+        cnt1Acum += 100.0 * ((ain1 - ain1Prev).abs() + (ain2 - ain2Prev).abs());
+        int icnt = cnt1Acum.toInt();
+        if (icnt > 0) 
+        {
+          cnt1Past = cnt1;
+          cnt1 += icnt;
+          cnt1Acum -= icnt;
+        }
+      }
+
+      if (ain1 > 2.35) din1 = true;
+      if (ain1 < 2.25) din1 = false;
+
+      if (ain1 > 2.85) din2 = true;
+      if (ain1 < 2.75) din2 = false;
     }
 
-    if (ain1 > 2.35) din1 = true;
-    if (ain1 < 2.25) din1 = false;
-
-    if (ain1 > 2.85) din2 = true;
-    if (ain1 < 2.75) din2 = false;
-
-
+    if (oldDout1 != dout1 || oldDout2 != dout2 || oldDin1 != din1 || oldDin2 != din2) 
+    {
+      publishRequest = true;
+    }
     ///////////////////////////////////////////////////////////////////////
   }
 
@@ -779,10 +789,11 @@ class _StudnaOutputMode
   maxTime = 60.0 * getDouble(getItemFromPath(config, ['manual', 'max_time']), defaultValue: 60.0),
   schedulerOkHigh = decodeScheduler(getItemFromPath(config, ['scheduler', 'ok_high'])),
   schedulerCriticalLow = decodeScheduler(getItemFromPath(config, ['scheduler', 'critical_low'])),
-  alternating = decodeAlternating2
+  /*alternating = decodeAlternating2
   (
     getItemFromPath(config, ['regulator']), decodeAlternating(getItemFromPath(config, ['alternating']))
-  ) 
+  )*/ 
+  alternating = decodeAlternating(getItemFromPath(config, ['alternating']))
   {
     if (config case {'scheduler2': List scheduler2}) 
     {
