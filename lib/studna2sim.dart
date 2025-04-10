@@ -78,6 +78,8 @@ class StudnaDevice extends ThingsboardDevice
   bool hasCnt1 = false;
   final _rnd = math.Random();
 
+  int currentHour = -1;
+
   _StudnaOutputMode _dout1Mode = _StudnaOutputMode('dout1', {'mode': 'manual'});
   _StudnaOutputState _dout1State = _StudnaOutputState();
   _StudnaOutputMode _dout2Mode = _StudnaOutputMode('dout2', {'mode': 'manual'});
@@ -88,6 +90,9 @@ class StudnaDevice extends ThingsboardDevice
   Map config = {};
 
   bool publishRequest = true;
+  List<Object> logTelemetry = [];
+
+  int firmwareState = -1;
 
   static String iso8601()
   {
@@ -169,10 +174,23 @@ class StudnaDevice extends ThingsboardDevice
       //if (hasBattery) "power": {"battery_charge": 100, "power_supply": "battery"},
       if (hasBattery) "batt": {"capacity": round(batteryPower,2), "voltage": round(3.4+batteryPower*0.008,3)},
       "system": {"uptime_sec": uptime, "v5v": round(4.85 + _rnd.nextDouble() * 0.2,2)},
-      "log": { "current time":   iso8601() }
     };
 
     publishTelemetry(telemetry);
+  }
+
+  void publishLog()
+  {
+    if (logTelemetry.isNotEmpty)
+    {
+      final telemetry = 
+      {
+        "log": logTelemetry.first
+      };
+
+      publishTelemetry(telemetry);
+      logTelemetry.removeAt(0);
+    }
   }
 
   StudnaDevice
@@ -300,6 +318,14 @@ class StudnaDevice extends ThingsboardDevice
   @override
   Future<bool> deviceRun() async 
   {
+      logTelemetry.add
+      (
+        {
+          "message" : "start up. version v9.000 ",
+          "type" : "debug",
+        }
+      );
+
     while (true) 
     {
       _control();
@@ -309,6 +335,8 @@ class StudnaDevice extends ThingsboardDevice
         publishRequest = false;
         publish();
       }
+      publishLog();
+    
       await Future.delayed(Duration(seconds: 1));
     }
   }
@@ -705,6 +733,24 @@ class StudnaDevice extends ThingsboardDevice
     {
       publishRequest = true;
     }
+
+    var now = DateTime.now();
+    if (currentHour != now.hour) 
+    {
+      currentHour = now.hour;
+      logTelemetry.add
+      (
+        {
+          "message" : "current time ${iso8601()}",
+          "type" : "info",
+        }
+      );
+    }
+
+    if (firmwareState >= 0)
+    {
+      _firmware();
+    }
     ///////////////////////////////////////////////////////////////////////
   }
 
@@ -724,25 +770,88 @@ class StudnaDevice extends ThingsboardDevice
   @override
   dynamic mqttRpc(String method, dynamic params) 
   {
+    void setOut(int index, dynamic value) 
+    {
+      switch (index) 
+      {
+        case 1:
+        {
+          _setDout1(value);
+          _manualDout1End = _manualEndTime(_dout1Mode);
+          _manualOut1Start = ain1;
+          _manualDout1Override = stateDout1 || _dout1Mode.mode != _StudnaOutputModeEnum.manual;
+        }
+        break;
+
+        case 2:
+        {
+          _setDout2(value);
+          _manualDout2End = _manualEndTime(_dout2Mode);
+          _manualOut2Start = ain2;
+          _manualDout2Override = stateDout2 || _dout2Mode.mode != _StudnaOutputModeEnum.manual;
+        }
+        break;
+      }
+    }
+
+    
     final result = {'status': 'OK'};
     log('RPC call: $method, params: $params');
+    logTelemetry.add
+    (
+      {
+        "action" : "RPC IN",
+        "content": "$method: $params",
+        "type" : "event",
+      }
+    );
     switch (method.trim().toLowerCase()) 
     {
       case 'setdout1':
       {
-        _setDout1(params);
-        _manualDout1End = _manualEndTime(_dout1Mode);
-        _manualOut1Start = ain1;
-        _manualDout1Override = stateDout1 || _dout1Mode.mode != _StudnaOutputModeEnum.manual;
+        setOut(1,params);
       }
       break;
 
       case 'setdout2':
       {
-        _setDout2(params);
-        _manualDout2End = _manualEndTime(_dout2Mode);
-        _manualOut2Start = ain2;
-        _manualDout2Override = stateDout2 || _dout2Mode.mode != _StudnaOutputModeEnum.manual;
+        setOut(2,params);
+      }
+      break;
+
+      case 'set':
+      {
+        if (params case [String element,int index ,Object value]) 
+        {
+          switch (element)
+          {
+              case 'dout':
+                switch (value.toString().toLowerCase())
+                {
+                    case 'on':
+                    {
+                      setOut(index, true);
+                    }
+                    break;
+
+                    case 'off':
+                    {
+                      setOut(index, false);
+                    }
+                    break;
+                }
+                
+          }
+        } 
+      }
+      break;
+
+      case 'firmware':
+      {
+        if (firmwareState < 0) 
+        {
+          firmwareState = 0;
+        }
       }
       break;
     }
@@ -769,6 +878,86 @@ class StudnaDevice extends ThingsboardDevice
     {
       stateDout2 = v;
       publishRequest = true;
+    }
+  }
+
+  void _firmware()
+  {
+    switch (firmwareState++)
+    {
+      case 1:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"DOWNLOADING","type":"firmware"}
+        );
+      }
+      break;
+
+      case 20:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"DOWNLOADED","type":"firmware"}
+        );
+      }
+      break;
+
+      case 21:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"UNPACKING","type":"firmware"}
+        );
+      }
+      break;
+
+      case 25:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"UNPACKED","type":"firmware"}
+        );
+      }
+      break;
+
+      case 28:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"VERIFIED","type":"firmware"}
+        );
+      }
+      break;
+
+      case 29:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"VERIFIED","type":"firmware"}
+        );
+      }
+      break;
+
+      case 30:
+      {
+        logTelemetry.add
+        (
+          {"fw_state":"RESTARTING","type":"firmware"}
+        );
+      }
+      break;
+
+      default:
+      if (firmwareState > 33)
+      {
+        firmwareState = -1;
+        logTelemetry.add
+        (
+          {"message":"start up. version v10.123 ","type":"debug"}
+        );
+      }
+      break;
     }
   }
 }
