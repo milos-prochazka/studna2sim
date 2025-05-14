@@ -12,6 +12,7 @@ class ThingsboardDevice
   int attributesSubscriptionId = -1;
   bool exitAfterDisconnect;
   int reconnectInterval = 60;
+  double history = 0;
 
   ThingsboardDevice({this.server = 'cml.seapraha.cz', required this.token, this.exitAfterDisconnect = true})
   : client = MqttServerClient(server, '');
@@ -89,10 +90,30 @@ class ThingsboardDevice
 
   int publishTelemetry(Map<String, dynamic> telemetry) 
   {
-    log('Publishing telemetry: $telemetry');
+    //log('Publishing telemetry: $telemetry');
+    final builder1 = MqttClientPayloadBuilder();
+    if (history > 0.001)
+    {
+      final ts = nowTime.toUtc().millisecondsSinceEpoch;
+      final dt = DateTime.fromMillisecondsSinceEpoch(ts);
+        print('Publish date=$dt');
+
+      final payload = { 'ts': ts, 'values': telemetry };
+      builder1.addString(jsonEncode(payload));
+    }
+    else
+    {
+      builder1.addString(jsonEncode(telemetry));
+    }
+    return client.publishMessage("v1/devices/me/telemetry", MqttQos.atLeastOnce, builder1.payload!);
+  }
+
+  int publishAttributes(Map<String, dynamic> telemetry) 
+  {
+    //log('Publishing attributes: $telemetry');
     final builder1 = MqttClientPayloadBuilder();
     builder1.addString(jsonEncode(telemetry));
-    return client.publishMessage("v1/devices/me/telemetry", MqttQos.atLeastOnce, builder1.payload!);
+    return client.publishMessage("v1/devices/me/attributes", MqttQos.atLeastOnce, builder1.payload!);
   }
 
   int publishResponse(String request, Map<String, dynamic> telemetry) 
@@ -318,6 +339,8 @@ class ThingsboardDevice
   {
     //print(text);
   }
+
+  DateTime get nowTime => DateTime.now().add(Duration(seconds: -history.toInt()));
 }
 
 enum TbAttributeScope { client, shared }

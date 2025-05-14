@@ -10,5 +10,5 @@ devices:
   - token: D4sdtGLQ1TjcWxNpkDNa
     type: studna2
     variant: max
-    up_speed: 0.01
-    down_speed: 0.001
+    up_speed: 0.0003
+    down_speed: 0.0001

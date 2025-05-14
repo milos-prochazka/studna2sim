@@ -24,7 +24,13 @@ Future studnaMqtt({required String server, required String token, dynamic config
   stringToEnum(StudnaDeviceMode.values, getString(getItemFromPath(config, ['variant']), defaultValue: 'single'));
   final upSpeed = getDouble(getItemFromPath(config, ['up_speed']), defaultValue: 0.02);
   final downSpeed = getDouble(getItemFromPath(config, ['down_speed']), defaultValue: 0.005);
-  final device = StudnaDevice(server: server, token: token, mode: mode, upSpeed: upSpeed, downSpeed: downSpeed);
+  final historyM = 60* getDouble(getItemFromPath(config, ['history_minutes']), defaultValue: 0);
+  final historyH = 3600* getDouble(getItemFromPath(config, ['history_hours']), defaultValue: 0);
+  final historyD = 86400* getDouble(getItemFromPath(config, ['history_days']), defaultValue: 0);
+
+  final history = historyM + historyH + historyD;
+
+  final device = StudnaDevice(server: server, token: token, mode: mode, upSpeed: upSpeed, downSpeed: downSpeed,history: history);
 
   await device.run();
 }
@@ -37,7 +43,7 @@ class StudnaDevice extends ThingsboardDevice
   bool hasGsm = false;
   String name = 'studna2sim';
   double updateInterval = 60.0;
-  final startTime = DateTime.now();
+  DateTime startTime = DateTime.now();
   DateTime lastTelemetryTime = DateTime.now();
   double ain1 = 3.3;
   double ain1State = 0.0;
@@ -81,9 +87,9 @@ class StudnaDevice extends ThingsboardDevice
   int currentHour = -1;
 
   _StudnaOutputMode _dout1Mode = _StudnaOutputMode('dout1', {'mode': 'manual'});
-  _StudnaOutputState _dout1State = _StudnaOutputState();
+  final _StudnaOutputState _dout1State = _StudnaOutputState();
   _StudnaOutputMode _dout2Mode = _StudnaOutputMode('dout2', {'mode': 'manual'});
-  _StudnaOutputState _dout2State = _StudnaOutputState();
+  final _StudnaOutputState _dout2State = _StudnaOutputState();
   _StudnaAinMode _ain1Mode = _StudnaAinMode('ain1', {'units': 'm'});
   _StudnaAinMode _ain2Mode = _StudnaAinMode('ain2', {'units': 'm'});
 
@@ -94,9 +100,9 @@ class StudnaDevice extends ThingsboardDevice
 
   int firmwareState = -1;
 
-  static String iso8601()
+  String iso8601()
   {
-    final now = DateTime.now();
+    final now = nowTime;
     if (now.isUtc)
     {
       return now.toIso8601String();
@@ -119,7 +125,7 @@ class StudnaDevice extends ThingsboardDevice
   /// Publish telemetry data to ThingsBoard
   void publish() 
   {
-    final uptime = DateTime.now().difference(startTime).inSeconds;
+    final uptime = nowTime.difference(startTime).inSeconds;
 
     final dout1ManualOverride = _dout1Mode.mode != _StudnaOutputModeEnum.manual && _manualDout1Override;
     final dout1Mode = dout1ManualOverride ? _StudnaOutputModeEnum.manual : _dout1Mode.mode;
@@ -200,9 +206,14 @@ class StudnaDevice extends ThingsboardDevice
       super.exitAfterDisconnect = false,
       StudnaDeviceMode mode = StudnaDeviceMode.single,
       this.upSpeed = 0.02,
-      this.downSpeed = 0.005}
+      this.downSpeed = 0.005,
+      double history = 0.0,}
   ) 
   {
+    this.history= history;
+    startTime = nowTime;
+    lastTelemetryTime = nowTime;
+
     switch (mode) 
     {
       case StudnaDeviceMode.single:
@@ -265,13 +276,13 @@ class StudnaDevice extends ThingsboardDevice
 
   double get weekSecond 
   {
-    final now = DateTime.now();
+    final now = nowTime;
     return 86400.0 * (now.weekday - DateTime.monday) + now.hour * 3600.0 + now.minute * 60.0 + now.second;
   }
 
   double get weekMinute 
   {
-    final now = DateTime.now();
+    final now = nowTime;
     return 1440.0 * (now.weekday - DateTime.monday) + now.hour * 60.0 + now.minute;
   }
 
@@ -315,6 +326,19 @@ class StudnaDevice extends ThingsboardDevice
     }
   }
 
+  Future<bool> publishVersion(String version) async 
+  {
+    final attr = 
+    {
+      "title": "S-ESTUDNA2",
+      "version": version,
+	    "cfg_wanted_version":6,
+    };
+
+    publishAttributes(attr);
+    return true;
+  }
+
   @override
   Future<bool> deviceRun() async 
   {
@@ -326,6 +350,8 @@ class StudnaDevice extends ThingsboardDevice
         }
       );
 
+    publishVersion('v9.000');
+
     while (true) 
     {
       _control();
@@ -334,10 +360,21 @@ class StudnaDevice extends ThingsboardDevice
       {
         publishRequest = false;
         publish();
+        if (history > 0.0) 
+        {
+          await Future.delayed(Duration(milliseconds: 100));
+        }
       }
       publishLog();
     
-      await Future.delayed(Duration(seconds: 1));
+      if (history > 0.0) 
+      {
+        history-= 1.0;
+      }
+      else
+      {
+        await Future.delayed(Duration(seconds: 1));
+      }
     }
   }
 
@@ -353,14 +390,14 @@ class StudnaDevice extends ThingsboardDevice
       publishRequest = true;
     }
 
-    if (DateTime.now().difference(lastTelemetryTime).inSeconds >= updateInterval) 
+    if (nowTime.difference(lastTelemetryTime).inSeconds >= updateInterval) 
     {
       publishRequest = true;
     }
 
     if (publishRequest) 
     {
-      lastTelemetryTime = DateTime.now();
+      lastTelemetryTime = nowTime;
       ain1State = ain1;
       ain2State = ain2;
     }
@@ -436,7 +473,7 @@ class StudnaDevice extends ThingsboardDevice
       {
         if (outputMode.alternating.enabled) 
         {
-          final now = DateTime.now();
+          final now = nowTime;
           final timeout = outputMode.alternating.timeout;
           final active = outputMode.alternating.active;
           final time = now.difference(outputState.alternatingTime).inSeconds;
@@ -623,7 +660,7 @@ class StudnaDevice extends ThingsboardDevice
 
     bool testManualEnd(DateTime manualEnd, double level, double manualStart, _StudnaOutputMode outputMode) 
     {
-      var result = DateTime.now().isAfter(manualEnd);
+      var result = nowTime.isAfter(manualEnd);
       if (outputMode.maxLevelChange != 0.0) 
       {
         result |= (level - manualStart).abs() > outputMode.maxLevelChange.abs();
@@ -734,7 +771,7 @@ class StudnaDevice extends ThingsboardDevice
       publishRequest = true;
     }
 
-    var now = DateTime.now();
+    var now = nowTime;
     if (currentHour != now.hour) 
     {
       currentHour = now.hour;
@@ -758,11 +795,11 @@ class StudnaDevice extends ThingsboardDevice
     {
       if (mode.mode == _StudnaOutputModeEnum.manual && mode.maxTime < 1.0) 
       {
-        return DateTime.now().add(Duration(days: 3660));
+        return nowTime.add(Duration(days: 3660));
       } 
       else 
       {
-      return DateTime.now().add(Duration(seconds: mode.maxTime.toInt()));
+      return nowTime.add(Duration(seconds: mode.maxTime.toInt()));
       }
     }
 
@@ -956,6 +993,7 @@ class StudnaDevice extends ThingsboardDevice
         (
           {"message":"start up. version v10.123 ","type":"debug"}
         );
+        publishVersion('v10.123');
       }
       break;
     }
